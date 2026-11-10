@@ -1,0 +1,30 @@
+# Environment variables & API keys
+.env
+*.env
+.env.local
+backend/.env
+agentic-ai-command-center/backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv*/
+backend/.venv/
+agentic-ai-command-center/backend/.venv/
+
+# Node
+node_modules/
+frontend/node_modules/
+agentic-ai-command-center/frontend/node_modules/
+dist/
+frontend/dist/
+agentic-ai-command-center/frontend/dist/
+.vite/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

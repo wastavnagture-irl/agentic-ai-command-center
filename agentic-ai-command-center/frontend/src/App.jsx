@@ -7,6 +7,8 @@ import {
   Handle,
   Position,
   MarkerType,
+  ReactFlowProvider,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import ReactMarkdown from "react-markdown";
@@ -15,7 +17,7 @@ import {
   Activity, ArrowUp, Bot, BrainCircuit, CheckCircle2, CloudSun,
   Code2, Command, GitBranch, LoaderCircle, MessageSquare, Network,
   Plus, Radio, Sparkles, Terminal, Wrench, Zap, Clock3, AlertCircle,
-  Cpu, ChevronDown, FileCode2, Globe
+  Cpu, ChevronDown, FileCode2, Globe, Maximize2
 } from "lucide-react";
 import { BACKEND_URL, API_ENDPOINTS } from "./config";
 
@@ -167,6 +169,99 @@ const nodeTypes = {
   toolNode: ToolNodeCard,
   finalNode: FinalNode,
 };
+
+function WorkflowCanvas({ nodes, edges, nodeTypes, isVisible }) {
+  const { fitView } = useReactFlow();
+  const containerRef = useRef(null);
+
+  // Auto-fit whenever nodes change or panel becomes visible/opened
+  useEffect(() => {
+    if (!isVisible || !nodes || nodes.length === 0) return;
+
+    const t1 = setTimeout(() => {
+      fitView({ padding: 0.25, duration: 350, maxZoom: 1.1 });
+    }, 60);
+
+    const t2 = setTimeout(() => {
+      fitView({ padding: 0.25, duration: 350, maxZoom: 1.1 });
+    }, 250);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [nodes, isVisible, fitView]);
+
+  // Auto-fit when container resizes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !isVisible) return;
+
+    const observer = new ResizeObserver(() => {
+      if (nodes && nodes.length > 0) {
+        fitView({ padding: 0.25, duration: 250, maxZoom: 1.1 });
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isVisible, nodes, fitView]);
+
+  const handleManualFit = () => {
+    fitView({ padding: 0.25, duration: 300, maxZoom: 1.1 });
+  };
+
+  return (
+    <div ref={containerRef} className="w-full h-full relative">
+      {nodes && nodes.length > 0 && (
+        <button
+          type="button"
+          onClick={handleManualFit}
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-lg border border-line bg-panel/90 backdrop-blur px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:border-violet-400/50 hover:bg-violet-500/10 hover:text-white shadow-sm"
+          title="Fit graph to view"
+        >
+          <Maximize2 size={12} className="text-violet-300" />
+          <span className="hidden sm:inline">Fit View</span>
+        </button>
+      )}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
+        minZoom={0.2}
+        maxZoom={1.5}
+        proOptions={{ hideAttribution: true }}
+        className="w-full h-full"
+      >
+        <Background color="#263247" gap={22} size={1} />
+        <Controls className="!m-3" />
+        <MiniMap
+          className="!m-3 hidden sm:block"
+          nodeColor={(node) =>
+            node.type === "finalNode"
+              ? "#34d399"
+              : node.type === "inputNode"
+              ? "#64748b"
+              : node.type === "agentNode"
+              ? "#8b7cff"
+              : node.data?.tool === "generate_and_save_code"
+              ? "#f59e0b"
+              : node.data?.tool === "web_research_summarizer"
+              ? "#38bdf8"
+              : node.data?.tool === "get_weather"
+              ? "#22d3ee"
+              : node.data?.tool === "search_github"
+              ? "#a78bfa"
+              : "#10b981"
+          }
+          maskColor="rgba(5,8,15,.75)"
+        />
+      </ReactFlow>
+    </div>
+  );
+}
 
 function buildFlow(prompt, trace, response, modelLabel = "Gemini 3.5 Flash-Lite") {
   const nodes = [{
@@ -342,8 +437,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [flow, setFlow] = useState({ nodes: [], edges: [] });
-  const [activeTab, setActiveTab] = useState("workflow");
+  const [mobileTab, setMobileTab] = useState("chat"); // "chat" | "workflow"
+  const [activeTab, setActiveTab] = useState("workflow"); // workspace inner tab: "workflow" | "status"
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= 768 : true
+  );
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const isWorkflowVisible = (isDesktop || mobileTab === "workflow") && activeTab === "workflow";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -412,22 +521,22 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden bg-canvas text-slate-100 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="h-[58px] shrink-0 flex items-center justify-between border-b border-line bg-[#0b1019]/95 px-5 md:px-7 z-20">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-2 text-violet-300 shadow-glow">
-            <Command size={18} />
+      <header className="h-[58px] shrink-0 flex items-center justify-between border-b border-line bg-[#0b1019]/95 px-3 sm:px-5 md:px-7 z-20">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-1.5 sm:p-2 text-violet-300 shadow-glow">
+            <Command size={17} />
           </div>
           <div>
-            <div className="text-sm font-extrabold tracking-wide">
+            <div className="text-xs sm:text-sm font-extrabold tracking-wide">
               NEXUS <span className="text-violet-300">AI</span>
             </div>
-            <div className="text-[9px] tracking-[.2em] text-slate-500">
+            <div className="hidden sm:block text-[9px] tracking-[.2em] text-slate-500">
               ALL-ROUNDER BUILDER COMMAND CENTER
             </div>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1">
+        <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
           <span className="font-mono text-[10px] tracking-wider text-emerald-300">
             SYSTEM ONLINE · 5 BUILDER TOOLS ACTIVE
@@ -435,15 +544,15 @@ export default function App() {
         </div>
 
         {/* Dynamic AI Model Selector Dropdown */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="relative flex items-center">
-            <span className="pointer-events-none absolute left-3 flex items-center text-violet-400">
-              <Cpu size={14} />
+            <span className="pointer-events-none absolute left-2.5 flex items-center text-violet-400">
+              <Cpu size={13} />
             </span>
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="h-8 rounded-xl border border-violet-400/30 bg-[#121927] pl-8 pr-8 text-xs font-semibold text-slate-200 outline-none transition hover:border-violet-400/50 focus:border-violet-400 focus:ring-1 focus:ring-violet-400/30 cursor-pointer appearance-none shadow-sm"
+              className="h-8 max-w-[150px] sm:max-w-none rounded-xl border border-violet-400/30 bg-[#121927] pl-7 pr-7 sm:pl-8 sm:pr-8 text-[11px] sm:text-xs font-semibold text-slate-200 outline-none transition hover:border-violet-400/50 focus:border-violet-400 focus:ring-1 focus:ring-violet-400/30 cursor-pointer appearance-none shadow-sm truncate"
               title="Select LLM Model"
             >
               {MODEL_OPTIONS.map((m) => (
@@ -452,8 +561,8 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2.5 flex items-center text-slate-400">
-              <ChevronDown size={13} />
+            <span className="pointer-events-none absolute right-2 flex items-center text-slate-400">
+              <ChevronDown size={12} />
             </span>
           </div>
 
@@ -463,12 +572,60 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container: Strict Side-by-Side 2-Column Split Screen (w-1/2 Left, w-1/2 Right) */}
+      {/* Mobile Tab Navigation Interface (Visible only on mobile screens < md) */}
+      <div className="flex md:hidden shrink-0 border-b border-line bg-[#0d1422] p-1.5 gap-1.5 z-10">
+        <button
+          type="button"
+          onClick={() => setMobileTab("chat")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition ${
+            mobileTab === "chat"
+              ? "bg-violet-600/30 text-violet-200 border border-violet-500/40 shadow-sm"
+              : "bg-white/[0.03] text-slate-400 border border-transparent hover:text-slate-200"
+          }`}
+        >
+          <MessageSquare size={14} className={mobileTab === "chat" ? "text-violet-300" : "text-slate-500"} />
+          <span>Chat</span>
+          {messages.length > 0 && (
+            <span className="text-[10px] bg-violet-400/20 text-violet-300 px-1.5 py-0.2 rounded-full font-mono">
+              {messages.length}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("workflow")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold transition ${
+            mobileTab === "workflow"
+              ? "bg-cyan-600/30 text-cyan-200 border border-cyan-500/40 shadow-sm"
+              : "bg-white/[0.03] text-slate-400 border border-transparent hover:text-slate-200"
+          }`}
+        >
+          <Network size={14} className={mobileTab === "workflow" ? "text-cyan-300" : "text-slate-500"} />
+          <span>Workflow</span>
+          {flow.nodes.length > 0 && (
+            <span className="text-[10px] bg-cyan-400/20 text-cyan-300 px-1.5 py-0.2 rounded-full font-mono">
+              {flow.nodes.length}
+            </span>
+          )}
+          {loading && (
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Main Container: Desktop Side-by-Side (md:w-1/2 each) vs Mobile Tabbed Full-Width */}
       <main className="flex-1 min-h-0 flex flex-row w-full overflow-hidden">
-        {/* Left Column (w-1/2): Command Interface */}
-        <section className="w-1/2 h-full flex flex-col min-h-0 border-r border-line bg-canvas">
+        {/* Left Column: Command Interface (Chat) */}
+        <section
+          className={`h-full flex-col min-h-0 border-r border-line bg-canvas ${
+            mobileTab === "chat" ? "flex w-full" : "hidden"
+          } md:flex md:w-1/2`}
+        >
           {/* Header */}
-          <div className="shrink-0 flex items-center justify-between border-b border-line px-5 py-3 bg-panel/50">
+          <div className="shrink-0 flex items-center justify-between border-b border-line px-4 sm:px-5 py-2.5 sm:py-3 bg-panel/50">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <Terminal size={14} className="text-violet-300" /> Command Interface
@@ -557,9 +714,18 @@ export default function App() {
                     )}
 
                     {message.trace && (
-                      <div className="mt-2.5 flex items-center gap-1.5 border-t border-white/5 pt-2 text-[10px] text-violet-300 font-mono">
-                        <GitBranch size={11} /> {message.trace.length} graph events recorded
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMobileTab("workflow")}
+                        className="mt-2.5 flex w-full items-center justify-between border-t border-white/5 pt-2 text-[10px] text-violet-300 font-mono hover:text-violet-200 transition text-left"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <GitBranch size={11} /> {message.trace.length} graph events recorded
+                        </span>
+                        <span className="md:hidden text-[9px] bg-violet-500/20 px-2 py-0.5 rounded-full text-violet-200 font-sans">
+                          View Workflow →
+                        </span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -583,8 +749,8 @@ export default function App() {
           </div>
 
           {/* Bottom Pinned Input Area */}
-          <div className="shrink-0 border-t border-line bg-[#0b1019] p-3.5">
-            <div className="rounded-xl border border-line bg-panel p-2.5 transition focus-within:border-violet-400/50">
+          <div className="shrink-0 border-t border-line bg-[#0b1019] p-2.5 sm:p-3.5">
+            <div className="rounded-xl border border-line bg-panel p-2 sm:p-2.5 transition focus-within:border-violet-400/50">
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
@@ -594,8 +760,11 @@ export default function App() {
                 className="w-full resize-none bg-transparent px-1 py-1 text-xs leading-relaxed text-slate-200 outline-none placeholder:text-slate-500 custom-scrollbar"
               />
               <div className="flex items-center justify-between pt-1.5">
-                <span className="flex items-center gap-1 text-[9px] text-slate-500">
+                <span className="hidden sm:flex items-center gap-1 text-[9px] text-slate-500">
                   <Zap size={10} /> Enter to execute · Shift+Enter newline
+                </span>
+                <span className="sm:hidden text-[9px] text-slate-500">
+                  Tap Execute
                 </span>
                 <button
                   disabled={!prompt.trim() || loading}
@@ -610,10 +779,14 @@ export default function App() {
           </div>
         </section>
 
-        {/* Right Column (w-1/2): Execution Workspace */}
-        <section className="w-1/2 h-full flex flex-col min-h-0 bg-[#0b101a] overflow-hidden">
+        {/* Right Column: Execution Workspace */}
+        <section
+          className={`h-full flex-col min-h-0 bg-[#0b101a] overflow-hidden ${
+            mobileTab === "workflow" ? "flex w-full" : "hidden"
+          } md:flex md:w-1/2`}
+        >
           {/* Header */}
-          <div className="shrink-0 flex items-center justify-between border-b border-line px-5 py-3 bg-panel/30">
+          <div className="shrink-0 flex items-center justify-between border-b border-line px-4 sm:px-5 py-2.5 sm:py-3 bg-panel/30">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <Network size={14} className="text-cyan-300" /> Execution Workspace
@@ -649,47 +822,19 @@ export default function App() {
                     <Network size={24} />
                   </div>
                   <p className="text-xs font-semibold text-slate-400">Your workflow will appear here</p>
-                  <p className="mt-1 text-[11px] text-slate-600">
+                  <p className="mt-1 text-[11px] text-slate-600 max-w-xs">
                     Execute a command with {getModelLabel(selectedModel)} to generate the live agent graph.
                   </p>
                 </div>
               ) : null}
-              <ReactFlow
-                key={flow.nodes.map((node) => node.id).join("-")}
-                nodes={flowProps.nodes}
-                edges={flowProps.edges}
-                nodeTypes={nodeTypes}
-                fitView
-                fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
-                minZoom={0.25}
-                maxZoom={1.5}
-                proOptions={{ hideAttribution: true }}
-                className="w-full h-full"
-              >
-                <Background color="#263247" gap={22} size={1} />
-                <Controls className="!m-3" />
-                <MiniMap
-                  className="!m-3"
-                  nodeColor={(node) =>
-                    node.type === "finalNode"
-                      ? "#34d399"
-                      : node.type === "inputNode"
-                      ? "#64748b"
-                      : node.type === "agentNode"
-                      ? "#8b7cff"
-                      : node.data?.tool === "generate_and_save_code"
-                      ? "#f59e0b"
-                      : node.data?.tool === "web_research_summarizer"
-                      ? "#38bdf8"
-                      : node.data?.tool === "get_weather"
-                      ? "#22d3ee"
-                      : node.data?.tool === "search_github"
-                      ? "#a78bfa"
-                      : "#10b981"
-                  }
-                  maskColor="rgba(5,8,15,.75)"
+              <ReactFlowProvider>
+                <WorkflowCanvas
+                  nodes={flowProps.nodes}
+                  edges={flowProps.edges}
+                  nodeTypes={nodeTypes}
+                  isVisible={isWorkflowVisible}
                 />
-              </ReactFlow>
+              </ReactFlowProvider>
             </div>
           ) : (
             <div className="flex-1 min-h-0 custom-scrollbar overflow-auto p-5 space-y-4">

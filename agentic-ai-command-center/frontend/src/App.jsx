@@ -17,8 +17,9 @@ import {
   Plus, Radio, Sparkles, Terminal, Wrench, Zap, Clock3, AlertCircle,
   Cpu, ChevronDown, FileCode2, Globe
 } from "lucide-react";
+import { BACKEND_URL, API_ENDPOINTS } from "./config";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = BACKEND_URL;
 
 const MODEL_OPTIONS = [
   { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite (Default)" },
@@ -362,7 +363,7 @@ export default function App() {
     setMessages((items) => [...items, { role: "user", content: clean }]);
 
     try {
-      const result = await fetch(`${API_URL}/api/execute`, {
+      const result = await fetch(API_ENDPOINTS.EXECUTE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: clean, model_id: selectedModel }),
@@ -388,7 +389,7 @@ export default function App() {
       setError(errorMsg);
       setMessages((items) => [...items, {
         role: "assistant",
-        content: `**Request Failed:** ${errorMsg}\n\nPlease check your backend terminal at port 8000.`,
+        content: `**Request Failed:** ${errorMsg}\n\nPlease check that the backend service at [${API_URL}](${API_URL}) is reachable and running.`,
         failed: true,
       }]);
     } finally {
@@ -699,7 +700,9 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded-xl bg-white/[.03] p-2.5">
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">Backend</div>
-                    <div className="mt-1 text-xs font-semibold text-emerald-300">Connected (:8000)</div>
+                    <div className="mt-1 text-xs font-semibold text-emerald-300 truncate" title={API_URL}>
+                      Connected ({API_URL.replace(/^https?:\/\//, "")})
+                    </div>
                   </div>
                   <div className="rounded-xl bg-white/[.03] p-2.5">
                     <div className="text-[9px] text-slate-500 uppercase tracking-wider">Requested Model</div>

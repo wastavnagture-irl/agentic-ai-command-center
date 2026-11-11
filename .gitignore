@@ -4,6 +4,8 @@
 .env.local
 backend/.env
 agentic-ai-command-center/backend/.env
+!frontend/.env*
+!agentic-ai-command-center/frontend/.env*
 
 # Python
 __pycache__/

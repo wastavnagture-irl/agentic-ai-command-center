@@ -196,7 +196,8 @@ def generate_and_save_code(filename: str, description: str, code_content: str) -
             f.write(code_content)
 
         file_size = os.path.getsize(file_path)
-        preview_url = f"http://localhost:8000/generated_projects/{clean_name}"
+        base_url = os.getenv("BACKEND_BASE_URL", "https://agentic-ai-command-center.onrender.com").rstrip("/")
+        preview_url = f"{base_url}/generated_projects/{clean_name}"
         return (
             f"Code successfully generated and saved to '{clean_name}' ({file_size} bytes).\n"
             f"- Description: {description.strip() or 'Generated Code Component'}\n"

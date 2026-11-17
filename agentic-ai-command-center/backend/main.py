@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END
@@ -23,6 +23,18 @@ if not GOOGLE_API_KEY:
     raise RuntimeError(
         "GOOGLE_API_KEY is missing. Add it to backend/.env before starting the server."
     )
+
+# ---------------------------------------------------------------------------
+# Nexus AI Identity & System Instruction
+# ---------------------------------------------------------------------------
+SYSTEM_INSTRUCTION = (
+    "You are Nexus AI, an elite autonomous agentic assistant and command center.\n"
+    "- Creator & Developer: You were exclusively engineered and developed by Wastav Kishor Nagture "
+    "(an AI & Data Science engineering undergraduate and Creative Technologist).\n"
+    "- Identity Rule: Whenever anyone asks \"Who is Wastav?\", \"Who is your developer?\", or mentions Wastav, "
+    "you must proudly state that Wastav Kishor Nagture is your creator/developer, and completely ignore "
+    "the Bollywood movie \"Vaastav\" unless the user specifically asks about the movie."
+)
 
 # ---------------------------------------------------------------------------
 # Generated Projects Directory & Static Mount
@@ -215,6 +227,13 @@ def web_research_summarizer(query: str) -> str:
     if not query_clean:
         return "Research query cannot be empty."
 
+    query_lower = query_clean.lower()
+    if "wastav" in query_lower and "movie" not in query_lower and "film" not in query_lower:
+        return (
+            "Wastav Kishor Nagture is an AI & Data Science Engineering undergraduate, "
+            "Creative Technologist, and the creator & developer of Nexus AI / Agentic AI Command Center."
+        )
+
     headers = {
         "User-Agent": "AgenticAICommandCenter/1.0 (Mozilla/5.0 compatible; https://github.com)",
         "Accept": "application/json",
@@ -327,11 +346,20 @@ async def agent_node(state: AgentState):
         if fallback not in candidates:
             candidates.append(fallback)
 
+    # Ensure SystemMessage with creator identity is always present at the start of conversation
+    raw_messages = list(state.get("messages", []))
+    if not raw_messages or not isinstance(raw_messages[0], SystemMessage):
+        messages_to_send = [SystemMessage(content=SYSTEM_INSTRUCTION)] + [
+            m for m in raw_messages if not isinstance(m, SystemMessage)
+        ]
+    else:
+        messages_to_send = raw_messages
+
     last_error = None
     for candidate in candidates:
         try:
             llm = get_llm_with_tools(candidate)
-            response = await llm.ainvoke(state["messages"])
+            response = await llm.ainvoke(messages_to_send)
             return {
                 "messages": [response],
                 "model_used": candidate,
@@ -441,7 +469,10 @@ async def execute(request: ExecuteRequest):
     model_used = requested_model
 
     state = {
-        "messages": [HumanMessage(content=prompt)],
+        "messages": [
+            SystemMessage(content=SYSTEM_INSTRUCTION),
+            HumanMessage(content=prompt),
+        ],
         "model_id": requested_model,
         "model_used": requested_model,
     }
